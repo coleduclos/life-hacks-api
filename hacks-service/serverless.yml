@@ -1,0 +1,54 @@
+service: hacks
+provider:
+  name: aws
+  runtime: nodejs12.x
+  lambdaHashingVersion: 20201221
+  stage: dev
+  region: us-west-2
+
+  environment:
+    HACKS_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+      Resource: "*"
+functions:
+  hacksList:
+    handler: api/v1/hacks.list
+    memorySize: 128
+    description: List all hacks.
+    events:
+      - http: 
+          path: v1/hacks 
+          method: get
+  hacksDetails:
+    handler: api/v1/hacks.get
+    memorySize: 128
+    description: Get hack details by id.
+    events:
+      - http:
+          path: v1/hacks/{id}
+          method: get
+resources:
+  Resources:
+    HacksDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"   
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.HACKS_TABLE}
+
