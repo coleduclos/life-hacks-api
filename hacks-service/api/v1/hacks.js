@@ -2,64 +2,56 @@
 
 const AWS = require('aws-sdk'); 
 const dynamoDb = new AWS.DynamoDB.DocumentClient();
+const uuid = require('uuid');
 
-module.exports.post = (event, context, callback) => {
+function Response(statusCode, body) {
+  this.statusCode = statusCode;
+  this.body = body;
+}
+
+function Hack(title, details, author){
+  const timestamp = new Date().getTime();
+  this.id = uuid.v1()
+  this.title = title
+  this.details = details
+  this.author = author
+  this.createdAt = timestamp
+  this.updatedAt = timestamp
+};
+
+// ------- CREATE ONE ---------
+module.exports.create = (event, context, callback) => {
   const requestBody = JSON.parse(event.body);
   const title = requestBody.title;
   const details = requestBody.details;
   const author = requestBody.author;
 
   // TODO: validate body
+  console.log('Validating hack...');
   if (typeof title !== 'string' || typeof details !== 'string' || typeof author !== 'string') {
     console.error('Validation Failed');
     callback(new Error('Couldn\'t submit candidate because of validation errors.'));
     return;
   }
-
-  createHack(hackInfo(title, details, author))
-    .then(res => {
-      callback(null, {
-        statusCode: 200,
-        body: JSON.stringify({
-          message: 'SUCCESS',
-          hackId: res.id
-        })
-      });
-    })
-    .catch(err => {
+  console.log('Creating hack...');
+  const hack = new Hack(title, details, author)
+  const onPut = (err, data) => {
+    if(err) {
       console.log(err);
-      callback(null, {
-        statusCode: 500,
-        body: JSON.stringify({
-          message: 'Unable to process request'
-        })
-      })
-    });
-};
-
-
-const createHack = hack => {
-  console.log('Creating hack');
+      callback(new Error('Could not create hack.'));
+    } else {
+      const response = new Response(200, data.Item);
+      return callback(null, response);
+    }
+  }
   const hackInfo = {
-    TableName: process.env.HACK_TABLE,
+    TableName: process.env.HACKS_TABLE,
     Item: hack,
   };
-  return dynamoDb.put(hackInfo).promise()
-    .then(res => hack);
+  dynamoDb.put(hackInfo, onPut)
 };
 
-const hackInfo = (title, details, author) => {
-  const timestamp = new Date().getTime();
-  return {
-    id: uuid.v1(),
-    title: title,
-    details: details,
-    author: author,
-    submittedAt: timestamp,
-    updatedAt: timestamp,
-  };
-};
-
+// ------- GET ONE ---------
 module.exports.get = (event, context, callback) => {
   const params = {
     TableName: process.env.HACKS_TABLE,
@@ -73,16 +65,21 @@ module.exports.get = (event, context, callback) => {
       console.error(err);
       callback(new Error('Could not retrieve hack.'));
     } else {
-      const response = {
-        statusCode: 200,
-        body: JSON.stringify(data.Item),
-      };
+      const response = new Response(500, '');
+      if ('Item' in data) {
+        response.statusCode = 200
+        response.body = JSON.stringify(data.Item)
+      } else {
+        response.statusCode = 404
+        response.body = JSON.stringify({'error' : 'Not found'})
+      }
       return callback(null, response);
     }
   };
   dynamoDb.get(params, onGet)
 };
 
+// ------- LIST ALL ---------
 module.exports.list = (event, context, callback) => {
   var params = {
       TableName: process.env.HACKS_TABLE,

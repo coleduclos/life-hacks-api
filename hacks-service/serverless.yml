@@ -26,7 +26,15 @@ functions:
       - http: 
           path: v1/hacks 
           method: get
-  hacksDetails:
+  hacksCreate:
+    handler: api/v1/hacks.create
+    memorySize: 128
+    description: List all hacks.
+    events:
+      - http:
+          path: v1/hacks
+          method: post
+  hacksGet:
     handler: api/v1/hacks.get
     memorySize: 128
     description: Get hack details by id.
